@@ -1,13 +1,16 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ScanAllResponse, ScanSingleResponse, WebHook } from './scanner.models';
+import {
+  RepoListResponse,
+  RepoDetailsResponse,
+  WebHook,
+} from './scanner.models';
 import { request } from 'undici';
 import { ContentType, EnvVariables } from './scanner.consts';
 
 export abstract class ScannerRepository {
-  abstract scanRepo(repoName: string): Promise<ScanAllResponse>;
-  abstract countFilesInRepo(repoName: string): Promise<number>;
-  abstract scanSingleRepo(repoName: string): Promise<ScanSingleResponse>;
+  abstract scanRepo(repoName: string): Promise<RepoListResponse>;
+  abstract scanRepoDetails(repoName: string): Promise<RepoDetailsResponse>;
 }
 
 @Injectable()
@@ -29,7 +32,7 @@ export class GithubScannerRepository implements ScannerRepository {
     };
   }
 
-  async scanRepo(repoName: string): Promise<ScanAllResponse> {
+  async scanRepo(repoName: string): Promise<RepoListResponse> {
     try {
       const { body } = await request(
         `https://api.github.com/repos/${this._userName}/${repoName}`,
@@ -38,14 +41,14 @@ export class GithubScannerRepository implements ScannerRepository {
         },
       );
 
-      return body.json() as Promise<ScanAllResponse>;
+      return body.json() as Promise<RepoListResponse>;
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException();
     }
   }
 
-  async scanSingleRepo(repoName: string): Promise<ScanSingleResponse> {
+  async scanRepoDetails(repoName: string): Promise<RepoDetailsResponse> {
     const [repoInfo, count, webHooks] = await Promise.all([
       this.scanRepo(repoName),
       this.countFilesInRepo(repoName),
@@ -63,26 +66,31 @@ export class GithubScannerRepository implements ScannerRepository {
   }
 
   async getContentOfFirstYmlFile(repoName: string): Promise<string> {
-    let content = '';
+    try {
+      let content = '';
 
-    if (this._ymlFilePath) {
-      const { body } = await request(
-        `https://api.github.com/repos/${this._userName}/${repoName}/contents/${this._ymlFilePath}`,
-        {
-          headers: this._deafultHeaders,
-        },
-      );
+      if (this._ymlFilePath) {
+        const { body } = await request(
+          `https://api.github.com/repos/${this._userName}/${repoName}/contents/${this._ymlFilePath}`,
+          {
+            headers: this._deafultHeaders,
+          },
+        );
 
-      const result = (await body.json()) as {
-        content: string;
-        encoding: 'base64' | 'utf-8';
-      };
+        const result = (await body.json()) as {
+          content: string;
+          encoding: 'base64' | 'utf-8';
+        };
 
-      const buffer = Buffer.from(result.content, result.encoding);
-      content = buffer.toString('utf-8');
+        const buffer = Buffer.from(result.content, result.encoding);
+        content = buffer.toString('utf-8');
+      }
+
+      return content;
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException();
     }
-
-    return content;
   }
 
   async countFilesInRepo(repoName: string, path = ''): Promise<number> {
@@ -117,12 +125,17 @@ export class GithubScannerRepository implements ScannerRepository {
   }
 
   async getActiveWebHooks(repoName: string): Promise<WebHook[]> {
-    const { body } = await request(
-      `https://api.github.com/repos/${this._userName}/${repoName}/hooks`,
-      { headers: this._deafultHeaders },
-    );
-    const result = await body.json();
+    try {
+      const { body } = await request(
+        `https://api.github.com/repos/${this._userName}/${repoName}/hooks`,
+        { headers: this._deafultHeaders },
+      );
+      const result = await body.json();
 
-    return (result as WebHook[]).filter((item) => item.active);
+      return (result as WebHook[]).filter((item) => item.active);
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException();
+    }
   }
 }

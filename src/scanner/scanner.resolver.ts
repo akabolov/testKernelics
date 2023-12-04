@@ -1,20 +1,20 @@
 import { Resolver, Query, Args } from '@nestjs/graphql';
-import { ScanAllResponse, ScanSingleResponse } from './scanner.models';
+import { RepoListResponse, RepoDetailsResponse } from './scanner.models';
 import { ScannerService } from './scanner.service';
 
 @Resolver()
 export class ScannerResolver {
   constructor(private readonly scannerService: ScannerService) {}
 
-  @Query(() => [ScanAllResponse])
-  getRepositories(): Promise<ScanAllResponse[]> {
+  @Query(() => [RepoListResponse])
+  listRepositories(): Promise<RepoListResponse[]> {
     return this.scannerService.scanAll();
   }
 
-  @Query(() => ScanSingleResponse)
-  async getSingleRepo(
+  @Query(() => RepoDetailsResponse)
+  async repoDetails(
     @Args('repoName') repoName: string,
-  ): Promise<ScanAllResponse> {
+  ): Promise<RepoListResponse> {
     return this.scannerService.scanSingle(repoName);
   }
 }

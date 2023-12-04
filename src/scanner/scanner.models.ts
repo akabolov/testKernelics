@@ -7,7 +7,7 @@ export class RepositoryOwner {
 }
 
 @ObjectType()
-export class ScanAllResponse {
+export class RepoListResponse {
   @Field(() => String)
   name: string;
 
@@ -37,7 +37,7 @@ export class WebHook {
 }
 
 @ObjectType()
-export class ScanSingleResponse extends ScanAllResponse {
+export class RepoDetailsResponse extends RepoListResponse {
   @Field(() => Int)
   count: number;
 

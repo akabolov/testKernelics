@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ScanAllResponse, ScanSingleResponse } from './scanner.models';
+import { RepoListResponse, RepoDetailsResponse } from './scanner.models';
 import { ScannerRepository } from './scanner.repository';
 import { ConfigService } from '@nestjs/config';
 import { EnvVariables } from './scanner.consts';
 
 export abstract class ScannerService {
-  abstract scanAll(): Promise<ScanAllResponse[]>;
-  abstract scanSingle(repoName: string): Promise<ScanSingleResponse>;
+  abstract scanAll(): Promise<RepoListResponse[]>;
+  abstract scanSingle(repoName: string): Promise<RepoDetailsResponse>;
 }
 
 @Injectable()
@@ -16,12 +16,12 @@ export class GithubScannerService implements ScannerService {
     private readonly configService: ConfigService,
   ) {}
 
-  scanAll(): Promise<ScanAllResponse[]> {
+  scanAll(): Promise<RepoListResponse[]> {
     return this._processBatchScanning();
   }
 
-  async scanSingle(repoName: string): Promise<ScanSingleResponse> {
-    return this.repository.scanSingleRepo(repoName);
+  async scanSingle(repoName: string): Promise<RepoDetailsResponse> {
+    return this.repository.scanRepoDetails(repoName);
   }
 
   private async _processBatchScanning() {
@@ -34,7 +34,7 @@ export class GithubScannerService implements ScannerService {
 
     const reposLength = repos.length;
     let processed = 0;
-    const processedRepos: ScanAllResponse[] = [];
+    const processedRepos: RepoListResponse[] = [];
 
     while (processed < reposLength) {
       const result = await Promise.all(
