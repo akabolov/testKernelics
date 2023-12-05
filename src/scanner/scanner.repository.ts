@@ -9,19 +9,21 @@ import { request } from 'undici';
 import { ContentType, EnvVariables } from './scanner.consts';
 
 export abstract class ScannerRepository {
+  abstract scanAllRepos(): Promise<RepoListResponse[]>;
   abstract scanRepo(repoName: string): Promise<RepoListResponse>;
   abstract scanRepoDetails(repoName: string): Promise<RepoDetailsResponse>;
 }
 
 @Injectable()
 export class GithubScannerRepository implements ScannerRepository {
-  private _userName: string;
   private _token: string;
   private _ymlFilePath: string;
   private _deafultHeaders: Record<string, string>;
 
-  constructor(private readonly configService: ConfigService) {
-    this._userName = this.configService.getOrThrow(EnvVariables.githubUsername);
+  constructor(
+    private readonly configService: ConfigService,
+    private _userName: string,
+  ) {
     this._token = this.configService.getOrThrow(EnvVariables.githubToken);
 
     this._deafultHeaders = {
@@ -30,6 +32,22 @@ export class GithubScannerRepository implements ScannerRepository {
       'User-Agent': 'nestjs-graphql-github-scanner',
       'X-GitHub-Api-Version': '2022-11-28',
     };
+  }
+
+  async scanAllRepos(): Promise<RepoListResponse[]> {
+    try {
+      const { body } = await request(
+        `https://api.github.com/users/${this._userName}/repos`,
+        {
+          headers: this._deafultHeaders,
+        },
+      );
+
+      return body.json() as Promise<RepoListResponse[]>;
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException();
+    }
   }
 
   async scanRepo(repoName: string): Promise<RepoListResponse> {
@@ -49,6 +67,8 @@ export class GithubScannerRepository implements ScannerRepository {
   }
 
   async scanRepoDetails(repoName: string): Promise<RepoDetailsResponse> {
+    console.log('DOING THE SCAN');
+
     const [repoInfo, count, webHooks] = await Promise.all([
       this.scanRepo(repoName),
       this.countFilesInRepo(repoName),
