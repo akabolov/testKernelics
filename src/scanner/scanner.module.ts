@@ -23,6 +23,7 @@ import { AsyncLimiter } from './scanner.limiter';
   controllers: [],
   providers: [
     ScannerResolver,
+    AsyncLimiter,
     {
       provide: ScannerService,
       useClass: GithubScannerService,
@@ -36,15 +37,6 @@ import { AsyncLimiter } from './scanner.limiter';
       ) => {
         const user = await userRepository.getUserByToken();
         return new GithubScannerRepository(configService, user.login);
-      },
-    },
-
-    {
-      provide: AsyncLimiter,
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        // return AsyncLimiter.getInstance(configService);
-        return new AsyncLimiter(configService);
       },
     },
   ],
