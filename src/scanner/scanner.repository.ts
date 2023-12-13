@@ -17,7 +17,6 @@ export abstract class ScannerRepository {
 @Injectable()
 export class GithubScannerRepository implements ScannerRepository {
   private _token: string;
-  private _ymlFilePath: string;
   private _deafultHeaders: Record<string, string>;
 
   constructor(
@@ -67,15 +66,17 @@ export class GithubScannerRepository implements ScannerRepository {
   }
 
   async scanRepoDetails(repoName: string): Promise<RepoDetailsResponse> {
-    console.log('DOING THE SCAN');
+    let ymlFileContent = '';
 
-    const [repoInfo, count, webHooks] = await Promise.all([
+    const [repoInfo, { count, pathToYml }, webHooks] = await Promise.all([
       this.scanRepo(repoName),
       this.countFilesInRepo(repoName),
       this.getActiveWebHooks(repoName),
     ]);
 
-    const ymlFileContent = await this.getContentOfFirstYmlFile(repoName);
+    if (pathToYml.length > 0) {
+      ymlFileContent = await this.getContentOfFirstYmlFile(repoName, pathToYml);
+    }
 
     return {
       ...repoInfo,
@@ -85,26 +86,31 @@ export class GithubScannerRepository implements ScannerRepository {
     };
   }
 
-  async getContentOfFirstYmlFile(repoName: string): Promise<string> {
+  async getContentOfFirstYmlFile(
+    repoName: string,
+    pathToYml: string,
+  ): Promise<string> {
     try {
+      if (!pathToYml.length) {
+        return '';
+      }
+
       let content = '';
 
-      if (this._ymlFilePath) {
-        const { body } = await request(
-          `https://api.github.com/repos/${this._userName}/${repoName}/contents/${this._ymlFilePath}`,
-          {
-            headers: this._deafultHeaders,
-          },
-        );
+      const { body } = await request(
+        `https://api.github.com/repos/${this._userName}/${repoName}/contents/${pathToYml}`,
+        {
+          headers: this._deafultHeaders,
+        },
+      );
 
-        const result = (await body.json()) as {
-          content: string;
-          encoding: 'base64' | 'utf-8';
-        };
+      const result = (await body.json()) as {
+        content: string;
+        encoding: 'base64' | 'utf-8';
+      };
 
-        const buffer = Buffer.from(result.content, result.encoding);
-        content = buffer.toString('utf-8');
-      }
+      const buffer = Buffer.from(result.content, result.encoding);
+      content = buffer.toString('utf-8');
 
       return content;
     } catch (error) {
@@ -113,8 +119,12 @@ export class GithubScannerRepository implements ScannerRepository {
     }
   }
 
-  async countFilesInRepo(repoName: string, path = ''): Promise<number> {
+  async countFilesInRepo(
+    repoName: string,
+    path = '',
+  ): Promise<{ count: number; pathToYml: string }> {
     try {
+      let pathToYml = '';
       let count = 0;
 
       const { body } = await request(
@@ -123,21 +133,25 @@ export class GithubScannerRepository implements ScannerRepository {
           headers: this._deafultHeaders,
         },
       );
+
       const content = (await body.json()) as any[];
 
       for (const item of content) {
         if (item.type === ContentType.dir) {
           const result = await this.countFilesInRepo(repoName, item.path);
-          count += result;
+          count += result.count;
         } else if (item.type === ContentType.file) {
-          if (item.name?.includes('.yml') && !this._ymlFilePath) {
-            this._ymlFilePath = item.path;
+          if (
+            item.name?.includes('.yml') ||
+            (item.name?.includes('.yaml') && !pathToYml.length)
+          ) {
+            pathToYml = item.path;
           }
           count++;
         }
       }
 
-      return count;
+      return { count, pathToYml };
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException();
@@ -152,7 +166,9 @@ export class GithubScannerRepository implements ScannerRepository {
       );
       const result = await body.json();
 
-      return (result as WebHook[]).filter((item) => item.active);
+      console.log(result);
+
+      return (result as WebHook[])?.filter?.((item) => item.active);
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException();

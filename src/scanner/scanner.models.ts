@@ -44,6 +44,6 @@ export class RepoDetailsResponse extends RepoListResponse {
   @Field(() => String)
   ymlFileContent: string;
 
-  @Field(() => [WebHook])
+  @Field(() => [WebHook], { nullable: true })
   webHooks: WebHook[];
 }
