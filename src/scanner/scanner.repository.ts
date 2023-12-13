@@ -166,8 +166,6 @@ export class GithubScannerRepository implements ScannerRepository {
       );
       const result = await body.json();
 
-      console.log(result);
-
       return (result as WebHook[])?.filter?.((item) => item.active);
     } catch (error) {
       console.error(error);
